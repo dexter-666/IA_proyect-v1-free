@@ -1,0 +1,20 @@
+{
+    "gemini_api_key": "",
+    "os_system": "windows",
+    "camera_index": 0,
+    "mic_device": 0,
+    "spk_device": 0,
+    "chrome_google_profile": "Default",
+    "chrome_exe_path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "timezone": "America/Bogota",
+    "language": "es-ES",
+    "thinking_sound": true,
+    "jarvis_voice": "Charon",
+    "spotify_client_id": "",
+    "spotify_client_secret": "",
+    "spotify_redirect_uri": "http://127.0.0.1:8888/callback",
+    "tmdb_api_key": "",
+    "openrouter_api_key": "",
+    "jarvis_theme": "gold",
+    "gpu_acceleration": false
+}

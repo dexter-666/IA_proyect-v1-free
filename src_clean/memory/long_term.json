@@ -1,0 +1,38 @@
+{
+  "identity": {
+    "name": {
+      "value": "",
+      "updated": "2026-05-21"
+    },
+    "honorific": {
+      "value": "Se\u00f1or",
+      "updated": "2026-05-17"
+    },
+    "city": {
+      "value": "Lima, Peru",
+      "updated": "2026-05-17"
+    },
+    "mood": {
+      "value": "festive",
+      "updated": "2026-05-17"
+    },
+    "address_form": {
+      "value": "compa\u00f1ero"
+    }
+  },
+  "preferences": {
+    "address_form": {
+      "value": "Se\u00f1or",
+      "updated": "2026-05-17"
+    }
+  },
+  "projects": {
+    "code_project_status": {
+      "value": "User deleted the entire code project.",
+      "updated": "2026-05-17"
+    }
+  },
+  "relationships": {},
+  "wishes": {},
+  "notes": {}
+}

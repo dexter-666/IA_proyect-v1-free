@@ -1,0 +1,12 @@
+{
+  "task_simplification_enabled": true,
+  "emotional_regulation_enabled": true,
+  "routine_gamification_enabled": true,
+  "eye_tracking_enabled": false,
+  "micro_movement_enabled": false,
+  "visual_feedback_enabled": true,
+  "high_contrast_mode": false,
+  "auto_learn_routines": false,
+  "speech_error_threshold": 0.5,
+  "font_size_scale": 1.0
+}

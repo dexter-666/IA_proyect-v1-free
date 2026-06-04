@@ -1,0 +1,39 @@
+# Environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*$py.class
+# Config and Sensitive Files
+config/api_keys.json
+config/rules.json
+custom_tools.json
+
+# Logs
+*.log
+jarvis.log
+
+# Scratch scripts
+patch_main.py
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+build_jarvis/
+dist_obfuscated/
+*.spec
+*.xml
+*.egg-info/
+*.bak
+
