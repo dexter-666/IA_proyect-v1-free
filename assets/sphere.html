@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS Neural Core</title>
+    <!-- Material Symbols & Sora Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --primary-fixed: #f59e0b;
+            --primary-fixed-dim: #78350f;
+            --primary-glow: rgba(245, 158, 11, 0.3);
+            --primary-ring-1-bg: rgba(245, 158, 11, 0.2);
+            --primary-ring-2-bg: rgba(245, 158, 11, 0.15);
+            --energy-level: 1.0;
+            --glow-intensity: 0.6;
+        }
+
+        /* Essential Utility Classes replacing Tailwind (saves ~100MB of RAM) */
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-start { align-items: flex-start; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .relative { position: relative; }
+        .absolute { position: absolute; }
+        .font-mono { font-family: 'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace; }
+        .font-bold { font-weight: bold; }
+        .opacity-50 { opacity: 0.5; }
+        .text-\[8px\] { font-size: 8px; }
+        .text-sm { font-size: 12px; }
+        .text-2xl { font-size: 24px; }
+        .tracking-widest { letter-spacing: 0.15em; }
+        .mt-0\.5 { margin-top: 2px; }
+        .px-2 { padding-left: 8px; padding-right: 8px; }
+        .py-2 { padding-top: 8px; padding-bottom: 8px; }
+        .w-\[74px\] { width: 74px; }
+        .h-\[74px\] { height: 74px; }
+        .w-\[96px\] { width: 96px; }
+        .h-\[96px\] { height: 96px; }
+        .w-\[78px\] { width: 78px; }
+        .h-\[78px\] { height: 78px; }
+        .rounded-full { border-radius: 9999px; }
+        .bg-\[var\(--primary-fixed\)\]\/20 { background-color: var(--primary-ring-1-bg); }
+        .bg-\[var\(--primary-fixed\)\]\/15 { background-color: var(--primary-ring-2-bg); }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+            font-family: 'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace;
+            user-select: none;
+        }
+
+        #neural-core-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #orb-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 48%; /* Centers the orb mathematically in the empty upper space above Bento Grid */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        #sphere-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            cursor: pointer;
+            filter: drop-shadow(0 0 35px var(--primary-glow));
+            transition: transform 0.1s ease-out;
+        }
+
+        /* Ambient glowing halos — centered exactly on orb */
+        .ambient-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 75%;
+            height: 75%;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(245, 158, 11, 0.22) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            mix-blend-mode: screen;
+            z-index: 1;
+            transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94), background 0.25s ease, width 0.25s ease, height 0.25s ease;
+        }
+
+        .ripple {
+            position: absolute;
+            border: 1px solid var(--primary-fixed);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: ripple-out 1.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+            z-index: 5;
+        }
+
+        @keyframes ripple-out {
+            0% { width: 0; height: 0; opacity: 1; transform: scale(1); }
+            100% { width: 100vw; height: 100vw; opacity: 0; border-width: 0px; transform: scale(1.5); }
+        }
+
+        .data-particle {
+            position: absolute;
+            background: var(--primary-fixed);
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            pointer-events: none;
+            filter: blur(0.5px);
+            box-shadow: 0 0 6px var(--primary-fixed);
+            z-index: 15;
+        }
+
+        /* Active / Synaptic load stats overlays */
+        #synaptic-stats {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--primary-fixed);
+            opacity: 0.75;
+            pointer-events: none;
+            text-shadow: 0 0 8px var(--primary-glow);
+        }
+
+        /* Bottom Capsule Mic Control Bar (Replacing horizontal write bar!) */
+        #bottom-mic-panel {
+            display: none !important; /* Completely removed from interface as requested */
+        }
+
+        .mic-capsule {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: var(--capsule-bg, rgba(5, 20, 36, 0.85));
+            padding: 8px 24px;
+            border-radius: 9999px;
+            border: 1px solid rgba(0, 212, 255, 0.25);
+            pointer-events: auto;
+            box-shadow: 0 0 35px var(--primary-glow), inset 0 0 15px rgba(0, 212, 255, 0.05);
+            backdrop-filter: blur(16px);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mic-label {
+            font-family: 'Sora', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.25em;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            opacity: 0.35;
+        }
+
+        .mic-label:hover {
+            opacity: 0.85;
+        }
+
+        .mic-halo {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            border: 1px solid var(--primary-fixed);
+            opacity: 0;
+            transition: all 0.5s ease;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.7); opacity: 0; }
+            50% { opacity: 0.45; }
+            100% { transform: scale(1.35); opacity: 0; }
+        }
+
+        .pulsing-ring-1 {
+            animation: pulse-ring 2.2s ease-out infinite;
+        }
+        .pulsing-ring-2 {
+            animation: pulse-ring 3.2s ease-out infinite 0.8s;
+        }
+
+        #mic-trigger {
+            position: relative;
+            z-index: 60;
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(14, 28, 45, 0.95) 0%, rgba(8, 16, 26, 0.95) 100%);
+            border: 1px solid var(--primary-fixed);
+            color: var(--primary-fixed);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--primary-glow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        #mic-trigger:hover {
+            background: var(--primary-fixed);
+            color: #051424;
+            box-shadow: 0 0 30px var(--primary-fixed);
+            transform: scale(1.08);
+        }
+
+        #mic-trigger:active {
+            transform: scale(0.94);
+        }
+
+        #mic-trigger.muted {
+            border-color: #ff3355;
+            color: #ff3355;
+            box-shadow: 0 0 20px rgba(255, 51, 85, 0.4);
+            background: radial-gradient(circle, rgba(40, 10, 15, 0.95) 0%, rgba(20, 5, 8, 0.95) 100%);
+        }
+
+        #mic-trigger.muted:hover {
+            background: #ff3355;
+            color: #ffffff;
+            box-shadow: 0 0 28px #ff3355;
+        }
+    </style>
+</head>
+<body>
+    <div id="neural-core-container">
+        <!-- Orb Wrapper for centering the sphere in the upper half of the window -->
+        <div id="orb-wrapper">
+            <!-- Central Neural Sphere -->
+            <canvas id="sphere-canvas"></canvas>
+            <!-- Ambient Halo — rendered AFTER canvas so z-index:1 sits behind canvas z-index:10 -->
+            <div class="ambient-glow" id="ambient-halo"></div>
+        </div>
+
+        <!-- Left Synaptic Stats Overlay -->
+        <div id="synaptic-stats" class="font-mono">
+            <div class="flex flex-col items-start">
+                <span class="opacity-50 text-[8px] tracking-widest">Core Sync</span>
+                <span id="stat-sync" class="font-bold text-sm mt-0.5">99.2%</span>
+            </div>
+            <div class="flex flex-col items-start">
+                <span class="opacity-50 text-[8px] tracking-widest">Synaptic Load</span>
+                <span id="stat-load" class="font-bold text-sm mt-0.5">8 ms</span>
+            </div>
+        </div>
+
+        <!-- Bottom Capsule Mic Control Bar (Replacing horizontal write bar!) -->
+        <div id="bottom-mic-panel">
+            <div class="mic-capsule" id="mic-capsule-border">
+                <!-- MIC ON Label -->
+                <button id="lbl-mic-on" onclick="setMuteFromWeb(false)" class="mic-label px-2 py-2 text-[var(--primary-fixed)]">
+                    Mic On
+                </button>
+                
+                <!-- Circular Pulse Trigger -->
+                <div class="relative flex items-center justify-center w-[74px] h-[74px]">
+                    <div class="absolute w-[96px] h-[96px] bg-[var(--primary-fixed)]/20 rounded-full mic-halo pulsing-ring-1" id="ring-1"></div>
+                    <div class="absolute w-[78px] h-[78px] bg-[var(--primary-fixed)]/15 rounded-full mic-halo pulsing-ring-2" id="ring-2"></div>
+                    <button id="mic-trigger" onclick="onMicTriggerClick()">
+                        <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;" id="mic-icon">mic</span>
+                    </button>
+                </div>
+                
+                <!-- MIC MUTED Label -->
+                <button id="lbl-mic-muted" onclick="setMuteFromWeb(true)" class="mic-label px-2 py-2 text-[#ff3355]">
+                    Mic Muted
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Qt WebChannel Bridging -->
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script>
+        // QWebChannel Interop
+        let pyBridge = null;
+        try {
+            new QWebChannel(qt.webChannelTransport, function (channel) {
+                pyBridge = channel.objects.pyBridge;
+                console.log("Qt WebChannel connected!");
+                // Proactively request theme colors from Python once QWebChannel is ready
+                if (pyBridge && pyBridge.request_theme) {
+                    pyBridge.request_theme();
+                }
+            });
+        } catch (e) {
+            console.log("Not in Qt WebEngine environment, running standalone.");
+        }
+
+        const root = document.documentElement;
+        const canvas = document.getElementById('sphere-canvas');
+        const ctx = canvas.getContext('2d');
+        const coreContainer = document.getElementById('neural-core-container');
+        const orbWrapper = document.getElementById('orb-wrapper');
+        const micBtn = document.getElementById('mic-trigger');
+        const micIcon = document.getElementById('mic-icon');
+        const ring1 = document.getElementById('ring-1');
+        const ring2 = document.getElementById('ring-2');
+        const lblOn = document.getElementById('lbl-mic-on');
+        const lblMuted = document.getElementById('lbl-mic-muted');
+        const capsuleBorder = document.getElementById('mic-capsule-border');
+
+        let isMuted = false;
+        let baseIntensity = 1.0;
+        let width, height;
+        let rotationX = 0;
+        let rotationY = 0;
+        let currentState = "LISTENING"; // LISTENING, THINKING, SPEAKING, MUTED
+        let currentVolume = 0.0;
+        let themeColors = {
+            PRI: '#f59e0b',
+            PRI_DIM: '#78350f',
+            TEXT: '#fde68a',
+            BG: '#0c0a00'
+        };
+
+        const NODE_COUNT = 90;
+        let sphereRadius = 180;
+        const nodes = [];
+
+        class Node {
+            constructor() {
+                this.theta = Math.random() * Math.PI * 2;
+                this.phi = Math.acos((Math.random() * 2) - 1);
+                this.x = 0;
+                this.y = 0;
+                this.z = 0;
+                this.size = 1.2 + Math.random() * 2.5;
+                this.color = themeColors.PRI;
+                this.pulse = Math.random() * Math.PI * 2;
+                this.pulseSpeed = 0.03 + Math.random() * 0.06;
+                this.synapticFiring = 0;
+                this.randomizeColor();
+            }
+
+            randomizeColor() {
+                const rand = Math.random();
+                if (rand > 0.6) {
+                    this.color = themeColors.PRI;
+                } else if (rand > 0.2) {
+                    this.color = themeColors.TEXT;
+                } else {
+                    this.color = themeColors.PRI_DIM;
+                }
+            }
+
+            update(rx, ry, intensity, radius) {
+                let speedMultiplier = 1;
+                if (currentState === "THINKING") speedMultiplier = 4.5;
+                else if (currentState === "SPEAKING") speedMultiplier = 2.0;
+                else if (currentState === "MUTED") speedMultiplier = 0.25;
+
+                this.pulse += this.pulseSpeed * speedMultiplier;
+                if (this.synapticFiring > 0) this.synapticFiring -= 0.04;
+
+                let x = radius * Math.sin(this.phi) * Math.cos(this.theta);
+                let y = radius * Math.sin(this.phi) * Math.sin(this.theta);
+                let z = radius * Math.cos(this.phi);
+
+                // Rotate Y
+                let x1 = x * Math.cos(ry) - z * Math.sin(ry);
+                let z1 = x * Math.sin(ry) + z * Math.cos(ry);
+
+                // Rotate X
+                let y2 = y * Math.cos(rx) - z1 * Math.sin(rx);
+                let z2 = y * Math.sin(rx) + z1 * Math.cos(rx);
+
+                this.x = x1;
+                this.y = y2;
+                this.z = z2;
+            }
+
+            draw(ctx, centerX, centerY, intensity) {
+                const scale = (this.z + sphereRadius) / (sphereRadius * 2) * 0.75 + 0.25;
+                const firingBoost = this.synapticFiring * 4.0;
+                const opacity = scale * (0.4 + Math.sin(this.pulse) * 0.25) * intensity;
+
+                ctx.beginPath();
+                const scaleModifier = (currentState === "SPEAKING") ? (1.0 + currentVolume * 2.0) : 1.0;
+                const radius = this.size * scale * scaleModifier + firingBoost;
+                
+                ctx.arc(centerX + this.x, centerY + this.y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = Math.min(1.0, opacity + this.synapticFiring);
+                ctx.fill();
+
+                if (scale > 0.6 || this.synapticFiring > 0.1) {
+                    ctx.shadowBlur = (15 + firingBoost * 10) * intensity;
+                    ctx.shadowColor = this.color;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+
+        function init() {
+            resize();
+            nodes.length = 0;
+            for (let i = 0; i < NODE_COUNT; i++) {
+                nodes.push(new Node());
+            }
+        }
+
+        function resize() {
+            width = canvas.width = orbWrapper.clientWidth;
+            height = canvas.height = orbWrapper.clientHeight;
+            // Scale radius to 42% of the minimum dimension to guarantee zero clipping
+            sphereRadius = Math.min(width, height) * 0.42;
+            // Cap radius at 145px for a perfect premium aesthetic in medium windows
+            if (sphereRadius > 145) sphereRadius = 145;
+            if (sphereRadius < 100) sphereRadius = 100;
+        }
+        window.addEventListener('resize', resize);
+
+        function triggerRipple() {
+            const ripple = document.createElement('div');
+            ripple.className = 'ripple';
+            ripple.style.left = '50%';
+            ripple.style.top = '50%';
+            ripple.style.transform = 'translate(-50%, -50%)';
+            orbWrapper.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 1500);
+
+            nodes.forEach(n => {
+                if (Math.random() > 0.6) n.synapticFiring = 0.9;
+            });
+        }
+
+        function createFloatingParticle() {
+            const particle = document.createElement('div');
+            particle.className = 'data-particle';
+            const rect = orbWrapper.getBoundingClientRect();
+            particle.style.left = (rect.width / 2 + (Math.random() - 0.5) * (sphereRadius * 1.8)) + 'px';
+            particle.style.top = (rect.height / 2 + (Math.random() - 0.5) * (sphereRadius * 1.8)) + 'px';
+            orbWrapper.appendChild(particle);
+
+            const duration = 1200 + Math.random() * 2000;
+            const anim = particle.animate([
+                { transform: 'translate(0,0) scale(1)', opacity: 0 },
+                { transform: `translate(${(Math.random() - 0.5) * 100}px, -80px) scale(1.4)`, opacity: 0.85, offset: 0.5 },
+                { transform: `translate(${(Math.random() - 0.5) * 200}px, -180px) scale(0)`, opacity: 0 }
+            ], { duration, easing: 'ease-out' });
+            anim.onfinish = () => particle.remove();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            if (currentState === "SPEAKING") {
+                const voicePulse = 1.0 + currentVolume * 0.22;
+                canvas.style.transform = `scale(${voicePulse})`;
+            } else if (currentState === "THINKING") {
+                const thinkPulse = 1.02 + Math.sin(Date.now() * 0.015) * 0.02;
+                canvas.style.transform = `scale(${thinkPulse})`;
+            } else {
+                canvas.style.transform = `scale(1)`;
+            }
+
+            let noise = (Math.random() - 0.5) * 0.12;
+            let intensity = baseIntensity;
+
+            if (currentState === "MUTED") {
+                intensity = 0.5;
+                rotationY += 0.0006;
+                rotationX += 0.0002;
+            } else if (currentState === "THINKING") {
+                intensity = 1.6;
+                rotationY += 0.018;
+                rotationX += 0.006;
+            } else if (currentState === "SPEAKING") {
+                intensity = 1.2 + currentVolume * 0.8;
+                rotationY += 0.006 + currentVolume * 0.03;
+                rotationX += 0.002 + currentVolume * 0.01;
+            } else { // LISTENING
+                intensity = 1.0 + noise;
+                rotationY += 0.0022;
+                rotationX += 0.0008;
+            }
+
+            // Calculate breathing radius dynamically based on state & speech volume
+            let currentRadius = sphereRadius;
+            if (currentState === "SPEAKING") {
+                currentRadius = sphereRadius * (1.0 + currentVolume * 0.32); // Expand sphere up to 32%
+            } else if (currentState === "THINKING") {
+                currentRadius = sphereRadius * (1.0 + Math.sin(Date.now() * 0.015) * 0.04); // Ethereal breathing pulse
+            }
+
+            // Draw beautiful central glowing arc-reactor core inside the canvas
+            if (currentState !== "MUTED") {
+                const glowGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, currentRadius * 0.95);
+                const centralGlowOpacity = 0.25 + (currentState === "SPEAKING" ? currentVolume * 0.35 : 0.06);
+                glowGrad.addColorStop(0, hexToRgba(themeColors.PRI, centralGlowOpacity));
+                glowGrad.addColorStop(1, 'transparent');
+                ctx.fillStyle = glowGrad;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, currentRadius * 0.95, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            nodes.forEach(node => node.update(rotationX, rotationY, intensity, currentRadius));
+
+            // Connections
+            const connectionLimit = (currentState === "MUTED") ? 1 : ((currentState === "THINKING") ? 5 : 3);
+            let distThreshold = (currentState === "MUTED") ? 100 : ((currentState === "THINKING") ? 170 : 140);
+            if (currentState === "SPEAKING") {
+                distThreshold = 140 + currentVolume * 70; // Synapses reach farther when speaking
+            }
+
+            for (let i = 0; i < nodes.length; i++) {
+                let connections = 0;
+                for (let j = i + 1; j < nodes.length; j++) {
+                    if (connections > connectionLimit) break;
+                    
+                    const dx = nodes[i].x - nodes[j].x;
+                    const dy = nodes[i].y - nodes[j].y;
+                    const dz = nodes[i].z - nodes[j].z;
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                    if (dist < distThreshold) {
+                        connections++;
+                        const scale = ((nodes[i].z + nodes[j].z) / 2 + currentRadius) / (currentRadius * 2);
+                        const opacity = (1 - dist / distThreshold) * 0.42 * scale * intensity;
+
+                        ctx.beginPath();
+                        ctx.lineWidth = 0.5 + (scale * 1.8);
+                        ctx.moveTo(centerX + nodes[i].x, centerY + nodes[i].y);
+                        ctx.lineTo(centerX + nodes[j].x, centerY + nodes[j].y);
+
+                        const grad = ctx.createLinearGradient(centerX + nodes[i].x, centerY + nodes[i].y, centerX + nodes[j].x, centerY + nodes[j].y);
+                        grad.addColorStop(0, nodes[i].color);
+                        grad.addColorStop(1, nodes[j].color);
+                        ctx.strokeStyle = grad;
+                        ctx.globalAlpha = opacity;
+                        ctx.stroke();
+
+                        const threshold = (currentState === "THINKING") ? 0.93 : 0.992;
+                        if (Math.random() > threshold) {
+                            ctx.lineWidth = 3.5;
+                            ctx.globalAlpha = opacity * 2.5;
+                            ctx.stroke();
+                            nodes[i].synapticFiring = 0.7;
+                        }
+                    }
+                }
+            }
+
+            nodes.sort((a, b) => a.z - b.z);
+            nodes.forEach(node => node.draw(ctx, centerX, centerY, intensity));
+
+            // Stats
+            document.getElementById('stat-sync').textContent = (currentState === "THINKING" ? (99.4 + Math.random() * 0.5) : (98.8 + Math.random() * 0.8)).toFixed(1) + '%';
+            document.getElementById('stat-load').textContent = (currentState === "THINKING" ? Math.floor(2 + Math.random() * 4) : (currentState === "MUTED" ? '0' : Math.floor(6 + Math.random() * 7))) + ' ms';
+
+            // Particles
+            if (currentState !== "MUTED") {
+                const particleChance = (currentState === "THINKING") ? 0.4 : ((currentState === "SPEAKING") ? 0.6 : 0.985);
+                if (Math.random() > particleChance) createFloatingParticle();
+            }
+
+            if (currentState === "THINKING" && Math.random() > 0.93) triggerRipple();
+
+            requestAnimationFrame(animate);
+        }
+
+        // Click actions
+        function onMicTriggerClick() {
+            if (pyBridge) {
+                pyBridge.toggle_mute();
+            }
+        }
+
+        function setMuteFromWeb(mute) {
+            if (isMuted !== mute) {
+                onMicTriggerClick();
+            }
+        }
+
+        // Exposed API called by Python to update UI state
+        window.updateState = function(state) {
+            currentState = state;
+            console.log("State updated to: " + state);
+
+            const micBtn = document.getElementById('mic-trigger');
+            const micIcon = document.getElementById('mic-icon');
+            const ring1 = document.getElementById('ring-1');
+            const ring2 = document.getElementById('ring-2');
+            const lblOn = document.getElementById('lbl-mic-on');
+            const lblMuted = document.getElementById('lbl-mic-muted');
+
+            if (state === "MUTED") {
+                isMuted = true;
+                micBtn.classList.add('muted');
+                micIcon.textContent = 'mic_off';
+                ring1.style.opacity = '0';
+                ring2.style.opacity = '0';
+                baseIntensity = 0.6;
+
+                // Pill UI labels styling
+                lblMuted.style.opacity = '1.0';
+                lblMuted.style.textShadow = '0 0 12px rgba(255, 51, 85, 0.8)';
+                lblOn.style.opacity = '0.35';
+                lblOn.style.textShadow = 'none';
+            } else {
+                isMuted = false;
+                micBtn.classList.remove('muted');
+                micIcon.textContent = 'mic';
+                ring1.style.opacity = '1';
+                ring2.style.opacity = '1';
+                baseIntensity = 1.0;
+                if (state === "SPEAKING") {
+                    baseIntensity = 1.2;
+                }
+
+                // Pill UI labels styling
+                lblOn.style.opacity = '1.0';
+                lblOn.style.textShadow = '0 0 12px var(--primary-glow)';
+                lblMuted.style.opacity = '0.35';
+                lblMuted.style.textShadow = 'none';
+            }
+        };
+
+        // Exposed API called by Python to update voice audio envelope
+        window.updateVolume = function(level) {
+            currentVolume = level;
+            const halo = document.getElementById('ambient-halo');
+
+            // Pulsate rings in capsule based on speaking level
+            if (currentState === "SPEAKING" && !isMuted) {
+                const ringScale1 = 1.0 + level * 0.45;
+                const ringScale2 = 1.0 + level * 0.25;
+                ring1.style.transform = `scale(${ringScale1})`;
+                ring2.style.transform = `scale(${ringScale2})`;
+                
+                // Pulsate background ambient glow (aura) in real-time!
+                // IMPORTANT: keep translate(-50%,-50%) so the halo stays centered on orb
+                if (halo) {
+                    const scale = 1.0 + level * 0.65; // expand up to 65% larger
+                    const opacity = 0.12 + level * 0.22; // brighten the aura with speaking volume
+                    halo.style.transform = `translate(-50%, -50%) scale(${scale})`;
+                    halo.style.background = `radial-gradient(circle, ${hexToRgba(themeColors.PRI, opacity)} 0%, transparent 70%)`;
+                }
+            } else {
+                ring1.style.transform = `none`;
+                ring2.style.transform = `none`;
+                
+                if (halo) {
+                    halo.style.transform = `translate(-50%, -50%)`;
+                    halo.style.background = `radial-gradient(circle, ${hexToRgba(themeColors.PRI, 0.2)} 0%, transparent 70%)`;
+                }
+            }
+        };
+
+
+        // Exposed API to adapt themes dynamically in real time
+        window.setThemeColors = function(colors) {
+            themeColors = {
+                PRI: colors.PRI || '#00d4ff',
+                PRI_DIM: colors.PRI_DIM || '#005f77',
+                TEXT: colors.TEXT || '#7aeeff',
+                BG: colors.BG || '#050c14'
+            };
+
+            // Apply custom CSS variables
+            document.documentElement.style.setProperty('--primary-fixed', themeColors.PRI);
+            document.documentElement.style.setProperty('--primary-fixed-dim', themeColors.PRI_DIM);
+            document.documentElement.style.setProperty('--primary-glow', hexToRgba(themeColors.PRI, 0.4));
+            document.documentElement.style.setProperty('--primary-ring-1-bg', hexToRgba(themeColors.PRI, 0.2));
+            document.documentElement.style.setProperty('--primary-ring-2-bg', hexToRgba(themeColors.PRI, 0.15));
+
+            // Dynamic capsule background matching theme background with 0.85 opacity!
+            const capsuleBg = hexToRgba(themeColors.BG, 0.85);
+            document.documentElement.style.setProperty('--capsule-bg', capsuleBg);
+
+            // Apply theme changes to widgets
+            document.getElementById('ambient-halo').style.background = `radial-gradient(circle, ${hexToRgba(themeColors.PRI, 0.2)} 0%, transparent 70%)`;
+            document.getElementById('synaptic-stats').style.color = themeColors.PRI;
+            
+            // Capsule borders and labels
+            capsuleBorder.style.borderColor = hexToRgba(themeColors.PRI, 0.3);
+            lblOn.style.color = themeColors.PRI;
+
+            if (!isMuted) {
+                lblOn.style.textShadow = `0 0 12px ${hexToRgba(themeColors.PRI, 0.6)}`;
+            }
+
+            nodes.forEach(node => node.randomizeColor());
+        };
+
+        function hexToRgba(hex, alpha) {
+            let c;
+            if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+                c = hex.substring(1).split('');
+                if(c.length == 3){
+                    c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+                }
+                c = '0x' + c.join('');
+                return `rgba(${[(c>>16)&255, (c>>8)&255, c&255].join(',')},${alpha})`;
+            }
+            return hex;
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
