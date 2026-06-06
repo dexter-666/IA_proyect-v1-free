@@ -8,21 +8,31 @@ import traceback
 from pathlib import Path
 
 def resolve_path(p: str) -> str:
+    try:
+        from actions.path_helper import get_desktop_path, get_documents_path, get_downloads_path
+        desktop_dir = str(get_desktop_path())
+        documents_dir = str(get_documents_path())
+        downloads_dir = str(get_downloads_path())
+    except Exception:
+        home = os.path.expanduser("~")
+        desktop_dir = os.path.join(home, "Desktop")
+        documents_dir = os.path.join(home, "Documents")
+        downloads_dir = os.path.join(home, "Downloads")
+
     if not p:
-        return os.path.expanduser("~/Desktop")
+        return desktop_dir
     
     p_lower = p.lower().strip()
-    home = os.path.expanduser("~")
     
     if p_lower == "desktop" or p_lower.startswith("desktop\\") or p_lower.startswith("desktop/"):
         rel = p[7:].lstrip("\\/")
-        return os.path.join(home, "Desktop", rel)
+        return os.path.join(desktop_dir, rel)
     elif p_lower == "downloads" or p_lower.startswith("downloads\\") or p_lower.startswith("downloads/"):
         rel = p[9:].lstrip("\\/")
-        return os.path.join(home, "Downloads", rel)
+        return os.path.join(downloads_dir, rel)
     elif p_lower == "documents" or p_lower.startswith("documents\\") or p_lower.startswith("documents/"):
         rel = p[9:].lstrip("\\/")
-        return os.path.join(home, "Documents", rel)
+        return os.path.join(documents_dir, rel)
     
     return os.path.abspath(p)
 

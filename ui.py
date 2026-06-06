@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QGridLayout, QLabel, QPushButton, QLineEdit, QTextEdit, 
     QListWidget, QListWidgetItem, QProgressBar, QDialog, QMessageBox,
-    QComboBox, QCheckBox, QGraphicsDropShadowEffect
+    QComboBox, QCheckBox, QGraphicsDropShadowEffect, QTabWidget
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, pyqtSlot, QObject, QTimer, QSize
 from PyQt6.QtGui import QFont, QColor, QIcon, QMouseEvent
@@ -383,8 +383,10 @@ class SystemWidget(QWidget):
         
         self.cpu_bar = QProgressBar()
         self.ram_bar = QProgressBar()
+        self.ram_bar.mousePressEvent = self.optimize_ram_click
+        self.ram_bar.setToolTip("Click to clean and optimize physical RAM usage, sir.")
         
-        self.bars = [(self.cpu_bar, "CPU Status"), (self.ram_bar, "RAM Status")]
+        self.bars = [(self.cpu_bar, "CPU Status"), (self.ram_bar, "RAM Status (Click to optimize)")]
         for bar, label in self.bars:
             lbl = QLabel(label)
             lbl.setStyleSheet(f"font-size: 10px; color: {C_PRI_DIM}; border: none; background: transparent;")
@@ -395,14 +397,33 @@ class SystemWidget(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_stats)
         self.timer.start(1000)
+        self._ram_opt_counter = 0
         self.update_stats()
         
+    def optimize_ram_click(self, event):
+        self.optimize_ram()
+        QMessageBox.information(self, "RAM Cleaned", "JARVIS physical RAM memory optimized, sir.")
+
+    def optimize_ram(self):
+        import gc
+        gc.collect()
+        try:
+            import ctypes
+            handle = ctypes.windll.kernel32.GetCurrentProcess()
+            ctypes.windll.psapi.EmptyWorkingSet(handle)
+        except Exception:
+            pass
+
     def update_stats(self):
         try:
             self.cpu_bar.setValue(int(psutil.cpu_percent()))
             self.ram_bar.setValue(int(psutil.virtual_memory().percent))
         except Exception:
             pass
+        self._ram_opt_counter += 1
+        if self._ram_opt_counter >= 60:
+            self._ram_opt_counter = 0
+            self.optimize_ram()
 
     def update_style(self):
         self.setStyleSheet(f"""
@@ -615,25 +636,62 @@ class DeviceSettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("JARVIS Settings Configuration Control")
-        self.resize(550, 740)
+        self.resize(500, 480)
         self.update_style()
         
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
         
-        layout.addWidget(QLabel("<h2>System Master Configurations</h2>"))
+        title_lbl = QLabel("<h2>System Master Configurations</h2>")
+        title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title_lbl)
         
-        layout.addWidget(QLabel("Gemini API Key:"))
+        # QTabWidget for compact representation (saves space on laptops)
+        self.tabs = QTabWidget()
+        self.tabs.setObjectName("SettingsTabs")
+        
+        # TAB 1: APIs & Provider
+        tab_api = QWidget()
+        lay_api = QVBoxLayout(tab_api)
+        lay_api.setSpacing(6)
+        
+        lay_api.addWidget(QLabel("Gemini API Key:"))
         self.inp_gemini = QLineEdit()
         self.inp_gemini.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addWidget(self.inp_gemini)
+        lay_api.addWidget(self.inp_gemini)
         
-        layout.addWidget(QLabel("OpenRouter API Key:"))
+        lay_api.addWidget(QLabel("OpenRouter API Key:"))
         self.inp_openrouter = QLineEdit()
         self.inp_openrouter.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addWidget(self.inp_openrouter)
+        lay_api.addWidget(self.inp_openrouter)
         
-        layout.addWidget(QLabel("Active Voice Model:"))
+        lay_api.addWidget(QLabel("AI Provider (Proveedor Principal):"))
+        self.cmb_ai_provider = QComboBox()
+        self.cmb_ai_provider.addItem("Google Gemini (Default)", "gemini")
+        self.cmb_ai_provider.addItem("OpenRouter API", "openrouter")
+        lay_api.addWidget(self.cmb_ai_provider)
+        
+        lay_api.addWidget(QLabel("LLM Engine (Free Version Restricted):"))
+        self.cmb_llm = QComboBox()
+        self.cmb_llm.addItem("Gemini 1.5 Flash (Basic/Free)", "gemini-1.5-flash")
+        self.cmb_llm.addItem("Gemini 2.0 Flash Lite (Optimized)", "gemini-2.0-flash-lite")
+        lay_api.addWidget(self.cmb_llm)
+        lay_api.addStretch()
+        
+        # TAB 2: Audio & Local Voice
+        tab_audio = QWidget()
+        lay_audio = QVBoxLayout(tab_audio)
+        lay_audio.setSpacing(6)
+        
+        lay_audio.addWidget(QLabel("Microphone Input Device:"))
+        self.cmb_mic = QComboBox()
+        lay_audio.addWidget(self.cmb_mic)
+        
+        lay_audio.addWidget(QLabel("Speaker Output Device:"))
+        self.cmb_speaker = QComboBox()
+        lay_audio.addWidget(self.cmb_speaker)
+        
+        lay_audio.addWidget(QLabel("Active Voice Model:"))
         self.cmb_voice = QComboBox()
         self.voices = [
             ("Aoede", "Femenina (Cálida y sofisticada ✨)"),
@@ -647,62 +705,47 @@ class DeviceSettingsDialog(QDialog):
         ]
         for val, desc in self.voices:
             self.cmb_voice.addItem(desc, val)
-        layout.addWidget(self.cmb_voice)
+        lay_audio.addWidget(self.cmb_voice)
         
-        layout.addWidget(QLabel("Theme Palette Scheme:"))
-        self.cmb_theme = QComboBox()
-        for k in THEMES.keys():
-            self.cmb_theme.addItem(k.upper(), k)
-        layout.addWidget(self.cmb_theme)
-        
-        layout.addWidget(QLabel("LLM Engine (Free Version Restricted):"))
-        self.cmb_llm = QComboBox()
-        self.cmb_llm.addItem("Gemini 1.5 Flash (Basic/Free)", "gemini-1.5-flash")
-        self.cmb_llm.addItem("Gemini 2.0 Flash Lite (Optimized)", "gemini-2.0-flash-lite")
-        layout.addWidget(self.cmb_llm)
-        
-        layout.addWidget(QLabel("AI Provider (Proveedor Principal):"))
-        self.cmb_ai_provider = QComboBox()
-        self.cmb_ai_provider.addItem("Google Gemini (Default)", "gemini")
-        self.cmb_ai_provider.addItem("OpenRouter API", "openrouter")
-        layout.addWidget(self.cmb_ai_provider)
-        
-        layout.addWidget(QLabel("Local AI Integration (Vosk Wake Word):"))
+        lay_audio.addWidget(QLabel("Local AI Integration (Vosk Wake Word):"))
         self.btn_download_vosk = QPushButton("Descargar Modelo IA Local (Vosk)")
         self.btn_download_vosk.setStyleSheet("background-color: #f59e0b; color: black; font-weight: bold;")
         self.btn_download_vosk.clicked.connect(self._manual_download_vosk)
-        layout.addWidget(self.btn_download_vosk)
+        lay_audio.addWidget(self.btn_download_vosk)
+        lay_audio.addStretch()
         
-        layout.addWidget(QLabel("Microphone Input Device:"))
-        self.cmb_mic = QComboBox()
-        layout.addWidget(self.cmb_mic)
+        # TAB 3: Theme & Integration (Spotify)
+        tab_other = QWidget()
+        lay_other = QVBoxLayout(tab_other)
+        lay_other.setSpacing(6)
         
-        layout.addWidget(QLabel("Speaker Output Device:"))
-        self.cmb_speaker = QComboBox()
-        layout.addWidget(self.cmb_speaker)
+        lay_other.addWidget(QLabel("Theme Palette Scheme:"))
+        self.cmb_theme = QComboBox()
+        for k in THEMES.keys():
+            self.cmb_theme.addItem(k.upper(), k)
+        lay_other.addWidget(self.cmb_theme)
         
         self.chk_gpu = QCheckBox("Enable GPU Rendering Acceleration")
-        layout.addWidget(self.chk_gpu)
+        lay_other.addWidget(self.chk_gpu)
         
-        # Spotify Developer Integration Section
-        layout.addWidget(QLabel("<h3>Spotify Developer Integration</h3>"))
+        lay_other.addWidget(QLabel("<h3>Spotify Developer Integration</h3>"))
         
         self.spotify_id_lbl = QLabel("Spotify Client ID:")
-        layout.addWidget(self.spotify_id_lbl)
+        lay_other.addWidget(self.spotify_id_lbl)
         self.inp_spotify_id = QLineEdit()
-        layout.addWidget(self.inp_spotify_id)
+        lay_other.addWidget(self.inp_spotify_id)
         
         self.spotify_secret_lbl = QLabel("Spotify Client Secret:")
-        layout.addWidget(self.spotify_secret_lbl)
+        lay_other.addWidget(self.spotify_secret_lbl)
         self.inp_spotify_secret = QLineEdit()
         self.inp_spotify_secret.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addWidget(self.inp_spotify_secret)
+        lay_other.addWidget(self.inp_spotify_secret)
         
         self.spotify_uri_lbl = QLabel("Spotify Redirect URI:")
-        layout.addWidget(self.spotify_uri_lbl)
+        lay_other.addWidget(self.spotify_uri_lbl)
         self.inp_spotify_uri = QLineEdit()
         self.inp_spotify_uri.setText("http://127.0.0.1:8888/callback")
-        layout.addWidget(self.inp_spotify_uri)
+        lay_other.addWidget(self.inp_spotify_uri)
         
         spotify_auth_layout = QHBoxLayout()
         self.btn_spotify_login = QPushButton("Conectar con Spotify")
@@ -710,9 +753,15 @@ class DeviceSettingsDialog(QDialog):
         self.lbl_spotify_status.setStyleSheet("color: #a3a3a3; font-style: italic;")
         spotify_auth_layout.addWidget(self.btn_spotify_login)
         spotify_auth_layout.addWidget(self.lbl_spotify_status)
-        layout.addLayout(spotify_auth_layout)
+        lay_other.addLayout(spotify_auth_layout)
         
         self.btn_spotify_login.clicked.connect(self.connect_spotify)
+        lay_other.addStretch()
+        
+        self.tabs.addTab(tab_api, "APIs & Core")
+        self.tabs.addTab(tab_audio, "Audio & Voz")
+        self.tabs.addTab(tab_other, "Spotify & Estilo")
+        layout.addWidget(self.tabs)
         
         btn_layout = QHBoxLayout()
         self.btn_save = QPushButton("Save Configurations")
@@ -967,6 +1016,26 @@ class DeviceSettingsDialog(QDialog):
             }}
             QPushButton:hover {{
                 background-color: white;
+            }}
+            QTabWidget::pane {{
+                border: 1px solid {C_BORDER};
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 6px;
+            }}
+            QTabBar::tab {{
+                background: rgba(0, 0, 0, 0.4);
+                color: {C_TEXT};
+                padding: 8px 12px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                border: 1px solid {C_BORDER};
+                border-bottom: none;
+                margin-right: 2px;
+            }}
+            QTabBar::tab:selected {{
+                background: {C_PRI};
+                color: black;
+                font-weight: bold;
             }}
         """)
 

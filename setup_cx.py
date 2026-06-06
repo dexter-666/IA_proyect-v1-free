@@ -3,9 +3,14 @@ from cx_Freeze import setup, Executable
 
 # Dependencies are automatically detected, but it might need fine tuning.
 build_exe_options = {
-    "packages": ["os", "sys", "json", "pathlib", "PyQt6", "actions", "agent", "memory", "core", "google"],
+    "packages": [
+        "os", "sys", "json", "pathlib", "PyQt6", "actions", "agent", "memory", "core", 
+        "google", "psutil", "pygetwindow", "pyrect", "pyautogui", "comtypes", "pycaw", 
+        "sounddevice", "numpy", "vosk", "spotipy", "docx", "openpyxl", "qtawesome",
+        "websockets", "asyncio", "ctypes", "win10toast"
+    ],
     "include_files": ["assets/", ("config/api_keys.example.json", "config/api_keys.json"), "config/accessibility_config.json", "config/rules.json", "config/user_profile.json"],
-    "excludes": ["tkinter", "unittest"],
+    "excludes": ["unittest"],
     "optimize": 2,
     "include_msvcr": True
 }

@@ -2544,25 +2544,27 @@ class JarvisLive:
                         result = f"Error en control de volumen: {ve}"
                 else:
                     if action in ["window_minimize", "minimize"]:
-                        if gw:
-                            try:
-                                window = gw.getActiveWindow()
-                                if window: window.minimize()
-                                result = "Ventana minimizada."
-                            except Exception as e:
-                                result = f"Error al minimizar: {e}"
-                        else:
-                            result = "Librería pygetwindow no disponible."
+                        try:
+                            import ctypes
+                            hwnd = ctypes.windll.user32.GetForegroundWindow()
+                            if hwnd:
+                                ctypes.windll.user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE = 6
+                                result = "Ventana activa minimizada."
+                            else:
+                                result = "No se encontró ninguna ventana activa."
+                        except Exception as e:
+                            result = f"Error al minimizar: {e}"
                     elif action in ["window_maximize", "maximize"]:
-                        if gw:
-                            try:
-                                window = gw.getActiveWindow()
-                                if window: window.maximize()
-                                result = "Ventana maximizada."
-                            except Exception as e:
-                                result = f"Error al maximizar: {e}"
-                        else:
-                            result = "Librería pygetwindow no disponible."
+                        try:
+                            import ctypes
+                            hwnd = ctypes.windll.user32.GetForegroundWindow()
+                            if hwnd:
+                                ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE = 3
+                                result = "Ventana activa maximizada."
+                            else:
+                                result = "No se encontró ninguna ventana activa."
+                        except Exception as e:
+                            result = f"Error al maximizar: {e}"
                     else:
                         r = await loop.run_in_executor(_TOOL_EXECUTOR, lambda: computer_settings(parameters=args, response=None, player=self.ui))
                         result = r or "Done."
@@ -2754,10 +2756,11 @@ class JarvisLive:
             elif name == "jarvis_ui_control":
                 action_ui = args.get("action", "").lower()
                 widget_name = args.get("widget", "").lower()
+                from PyQt6.QtCore import QTimer
                 if action_ui == "minimize":
                     try:
                         if hasattr(self.ui, "_win") and hasattr(self.ui._win, "showMinimized"):
-                            QMetaObject.invokeMethod(self.ui._win, "showMinimized", Qt.ConnectionType.QueuedConnection)
+                            QTimer.singleShot(0, self.ui._win.showMinimized)
                         elif hasattr(self.ui, "root") and hasattr(self.ui.root, "iconify"):
                             self.ui.root.after(0, self.ui.root.iconify)
                         result = "Interfaz de usuario minimizada."
@@ -2766,8 +2769,8 @@ class JarvisLive:
                 elif action_ui == "restore":
                     try:
                         if hasattr(self.ui, "_win") and hasattr(self.ui._win, "showNormal"):
-                            QMetaObject.invokeMethod(self.ui._win, "showNormal", Qt.ConnectionType.QueuedConnection)
-                            QMetaObject.invokeMethod(self.ui._win, "activateWindow", Qt.ConnectionType.QueuedConnection)
+                            QTimer.singleShot(0, self.ui._win.showNormal)
+                            QTimer.singleShot(0, self.ui._win.activateWindow)
                         elif hasattr(self.ui, "root") and hasattr(self.ui.root, "deiconify"):
                             def _restore():
                                 self.ui.root.deiconify()
@@ -2785,8 +2788,8 @@ class JarvisLive:
                         if action_ui == "show":
                             try:
                                 if hasattr(self.ui, "_win") and hasattr(self.ui._win, "showNormal"):
-                                    QMetaObject.invokeMethod(self.ui._win, "showNormal", Qt.ConnectionType.QueuedConnection)
-                                    QMetaObject.invokeMethod(self.ui._win, "activateWindow", Qt.ConnectionType.QueuedConnection)
+                                    QTimer.singleShot(0, self.ui._win.showNormal)
+                                    QTimer.singleShot(0, self.ui._win.activateWindow)
                                 elif hasattr(self.ui, "root") and hasattr(self.ui.root, "deiconify"):
                                     def _restore():
                                         self.ui.root.deiconify()
@@ -2890,11 +2893,50 @@ class JarvisLive:
                 try:
                     rms = float(np.sqrt(np.mean(indata.astype(np.float32) ** 2))) / 32768.0
                     self.ui.set_audio_level(min(1.0, rms * 15))
+                    
+                    # Voice interruption: if the user speaks while JARVIS is speaking, silence immediately
+                    threshold = 0.003
+                    try:
+                        import json
+                        from memory.config_manager import BASE_DIR
+                        api_cfg_path = BASE_DIR / "config" / "api_keys.json"
+                        if api_cfg_path.exists():
+                            c = json.loads(api_cfg_path.read_text(encoding="utf-8"))
+                            threshold = float(c.get("mic_sensitivity", 0.003))
+                    except Exception:
+                        pass
+                    
+                    interrupt_threshold = max(0.015, threshold * 3.5)
+                    
+                    if rms > interrupt_threshold:
+                        self._interrupt_frames = getattr(self, "_interrupt_frames", 0) + 1
+                        if self._interrupt_frames >= 5:  # ~100ms of continuous voice
+                            if not self._stop_requested.is_set():
+                                self._stop_requested.set()
+                                print(f"[JARVIS] 🎤 Voice interruption detected! (RMS: {rms:.4f} > {interrupt_threshold:.4f})")
+                                from PyQt6.QtCore import QTimer
+                                QTimer.singleShot(0, self._on_stop_pressed)
+                    else:
+                        self._interrupt_frames = 0
                 except Exception:
                     pass
 
         try:
+            mic_device_idx = None
+            try:
+                import json
+                from memory.config_manager import BASE_DIR
+                api_cfg_path = BASE_DIR / "config" / "api_keys.json"
+                if api_cfg_path.exists():
+                    c = json.loads(api_cfg_path.read_text(encoding="utf-8"))
+                    d = c.get("mic_device", "")
+                    if d != "":
+                        mic_device_idx = int(d)
+            except Exception:
+                pass
+
             with sd.InputStream(
+                device=mic_device_idx,
                 samplerate=SEND_SAMPLE_RATE,
                 channels=CHANNELS,
                 dtype="int16",
@@ -2993,7 +3035,21 @@ class JarvisLive:
     async def _play_audio(self):
         print("[JARVIS] 🔊 Play iniciado")
 
+        speaker_device_idx = None
+        try:
+            import json
+            from memory.config_manager import BASE_DIR
+            api_cfg_path = BASE_DIR / "config" / "api_keys.json"
+            if api_cfg_path.exists():
+                c = json.loads(api_cfg_path.read_text(encoding="utf-8"))
+                d = c.get("speaker_device", "")
+                if d != "":
+                    speaker_device_idx = int(d)
+        except Exception:
+            pass
+
         stream = sd.RawOutputStream(
+            device=speaker_device_idx,
             samplerate=RECEIVE_SAMPLE_RATE,
             channels=CHANNELS,
             dtype="int16",

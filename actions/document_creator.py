@@ -1,27 +1,60 @@
+# -*- coding: utf-8 -*-
 import os
 from pathlib import Path
 from datetime import datetime
 
 def document_creator(parameters: dict, player=None) -> str:
     """
-    Crea documentos de texto, Word o Excel en base a los parámetros.
+    Crea documentos de texto, Word o Excel locales.
+    Soporta rutas personalizadas en toda la PC usando el parámetro 'save_path'.
     """
     action = parameters.get("action", "").lower()
     title = parameters.get("title", "Documento_Sin_Titulo")
     content = parameters.get("content", "")
     sheets = parameters.get("sheets", [])
+    save_path_str = parameters.get("save_path", "")
     
-    # Determinar ruta de guardado (por defecto, el Escritorio)
-    desktop_path = Path(os.path.join(os.environ["USERPROFILE"], "Desktop"))
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c==' ']).rstrip().replace(" ", "_")
     if not safe_title:
         safe_title = "Documento"
-        
+
+    # Determinar la ruta de guardado final en la PC
+    if save_path_str:
+        file_path = Path(save_path_str)
+        # Si la ruta dada es un directorio, le añadimos el nombre de archivo correspondiente
+        if file_path.is_dir() or save_path_str.endswith("\\") or save_path_str.endswith("/"):
+            if action in ["word", "google_doc"]:
+                ext = ".docx"
+            elif action in ["excel", "google_sheet"]:
+                ext = ".xlsx"
+            else:
+                ext = ".txt"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_name = f"{safe_title}_{timestamp}{ext}"
+            file_path = file_path / file_name
+        else:
+            # Asegurar que el directorio padre existe
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        # Por defecto, se escribe en el Escritorio del usuario (OneDrive/Español compatible)
+        try:
+            from actions.path_helper import get_desktop_path
+            desktop_path = get_desktop_path()
+        except Exception:
+            desktop_path = Path(os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Desktop"))
+            
+        if action in ["word", "google_doc"]:
+            ext = ".docx"
+        elif action in ["excel", "google_sheet"]:
+            ext = ".xlsx"
+        else:
+            ext = ".txt"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_name = f"{safe_title}_{timestamp}{ext}"
+        file_path = desktop_path / file_name
+
     try:
         if action == "word" or action == "google_doc":
-            # Si piden google doc, por ahora lo hacemos Word local y avisamos.
             try:
                 from docx import Document
                 doc = Document()
@@ -42,10 +75,8 @@ def document_creator(parameters: dict, player=None) -> str:
                     else:
                         doc.add_paragraph(line)
                         
-                file_name = f"{safe_title}_{timestamp}.docx"
-                file_path = desktop_path / file_name
                 doc.save(file_path)
-                return f"Documento Word creado exitosamente en tu Escritorio como '{file_name}'."
+                return f"Documento Word creado exitosamente en: '{file_path}'."
             except ImportError:
                 return "Error: Faltan librerías para crear Word. (python-docx)"
                 
@@ -69,19 +100,15 @@ def document_creator(parameters: dict, player=None) -> str:
                     for row in rows:
                         ws.append(row)
                         
-                file_name = f"{safe_title}_{timestamp}.xlsx"
-                file_path = desktop_path / file_name
                 wb.save(file_path)
-                return f"Planilla Excel creada exitosamente en tu Escritorio como '{file_name}'."
+                return f"Planilla Excel creada exitosamente en: '{file_path}'."
             except ImportError:
                 return "Error: Faltan librerías para crear Excel. (openpyxl)"
                 
         elif action == "text":
-            file_name = f"{safe_title}_{timestamp}.txt"
-            file_path = desktop_path / file_name
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(f"{title}\n\n{content}")
-            return f"Archivo de texto creado en tu Escritorio como '{file_name}'."
+            return f"Archivo de texto creado exitosamente en: '{file_path}'."
             
         else:
             return f"Acción '{action}' no soportada o desconocida. Usá 'word', 'excel' o 'text'."

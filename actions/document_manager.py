@@ -16,21 +16,30 @@ def document_manager(parameters: dict, player=None) -> str:
         return "Error: Faltan parámetros requeridos ('action' o 'path')."
 
     # Resolve paths (desktop, documents, downloads, etc)
+    try:
+        from actions.path_helper import get_desktop_path, get_documents_path, get_downloads_path
+        desktop_dir = get_desktop_path()
+        documents_dir = get_documents_path()
+        downloads_dir = get_downloads_path()
+    except Exception:
+        desktop_dir = Path.home() / "Desktop"
+        documents_dir = Path.home() / "Documents"
+        downloads_dir = Path.home() / "Downloads"
+
     path_lower = file_path_str.lower()
-    home_dir = Path.home()
     if path_lower.startswith("desktop"):
-        file_path = home_dir / "Desktop" / file_path_str[len("desktop"):].lstrip("\\/")
+        file_path = desktop_dir / file_path_str[len("desktop"):].lstrip("\\/")
     elif path_lower.startswith("documents"):
-        file_path = home_dir / "Documents" / file_path_str[len("documents"):].lstrip("\\/")
+        file_path = documents_dir / file_path_str[len("documents"):].lstrip("\\/")
     elif path_lower.startswith("downloads"):
-        file_path = home_dir / "Downloads" / file_path_str[len("downloads"):].lstrip("\\/")
+        file_path = downloads_dir / file_path_str[len("downloads"):].lstrip("\\/")
     else:
         file_path = Path(file_path_str)
 
     if not file_path.exists() and action not in ["edit"]:
         # Let's try searching on Desktop as fallback if not absolute
         if not file_path.is_absolute():
-            file_path = home_dir / "Desktop" / file_path_str
+            file_path = desktop_dir / file_path_str
             if not file_path.exists():
                 return f"Error: No se encontró el archivo '{file_path_str}'."
 

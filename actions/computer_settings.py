@@ -46,10 +46,10 @@ def computer_settings(parameters: dict, response=None, player=None) -> str:
             
     elif action in ("minimize", "window_minimize"):
         try:
-            import pygetwindow as gw
-            window = gw.getActiveWindow()
-            if window:
-                window.minimize()
+            import ctypes
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE = 6
                 return "Active window minimized."
             return "No active window found."
         except Exception as e:
@@ -57,10 +57,10 @@ def computer_settings(parameters: dict, response=None, player=None) -> str:
 
     elif action in ("maximize", "window_maximize"):
         try:
-            import pygetwindow as gw
-            window = gw.getActiveWindow()
-            if window:
-                window.maximize()
+            import ctypes
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE = 3
                 return "Active window maximized."
             return "No active window found."
         except Exception as e:

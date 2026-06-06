@@ -135,43 +135,105 @@ def main():
         os.makedirs(config_dir, exist_ok=True)
         print("\033[32m[OK] Directorio config/ creado.\033[0m")
     
-    if not os.path.exists(api_keys_path):
-        if os.path.exists(api_keys_template):
-            shutil.copy2(api_keys_template, api_keys_path)
-            print("\033[32m[OK] Archivo api_keys.json creado desde plantilla.\033[0m")
-            print("\033[33m[INFO] Al iniciar JARVIS se te pedirán tus API Keys de Gemini y OpenRouter.\033[0m")
-        else:
-            # Crear un archivo mínimo con campos vacíos
-            import json
-            default_config = {
-                "gemini_api_key": "",
-                "os_system": "windows",
-                "camera_index": 0,
-                "mic_device": 0,
-                "spk_device": 0,
-                "chrome_google_profile": "Default",
-                "chrome_exe_path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-                "timezone": "America/Bogota",
-                "language": "es-ES",
-                "thinking_sound": True,
-                "jarvis_voice": "Charon",
-                "spotify_client_id": "",
-                "spotify_client_secret": "",
-                "spotify_redirect_uri": "http://127.0.0.1:8888/callback",
-                "tmdb_api_key": "",
-                "openrouter_api_key": "",
-                "jarvis_theme": "gold",
-                "gpu_acceleration": False
-            }
-            with open(api_keys_path, "w", encoding="utf-8") as f:
-                json.dump(default_config, f, indent=4)
-            print("\033[32m[OK] Archivo api_keys.json creado con valores por defecto.\033[0m")
-            print("\033[33m[INFO] Al iniciar JARVIS se te pedirán tus API Keys de Gemini y OpenRouter.\033[0m")
-    else:
-        print("\033[32m[OK] Archivo api_keys.json existente detectado.\033[0m")
+    import json
     
+    # Load existing config or default
+    current_config = {}
+    if os.path.exists(api_keys_path):
+        try:
+            with open(api_keys_path, "r", encoding="utf-8") as f:
+                current_config = json.load(f)
+        except Exception:
+            pass
+
+    if not current_config:
+        current_config = {
+            "gemini_api_key": "",
+            "os_system": "windows",
+            "camera_index": 0,
+            "mic_device": "",
+            "speaker_device": "",
+            "chrome_google_profile": "Default",
+            "chrome_exe_path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+            "timezone": "America/Bogota",
+            "language": "es-ES",
+            "thinking_sound": True,
+            "jarvis_voice": "Charon",
+            "spotify_client_id": "",
+            "spotify_client_secret": "",
+            "spotify_redirect_uri": "http://127.0.0.1:8888/callback",
+            "tmdb_api_key": "",
+            "openrouter_api_key": "",
+            "jarvis_theme": "gold",
+            "gpu_acceleration": False
+        }
+
+    # Load existing name from memory if exists
+    memory_dir = os.path.join(".", "memory")
+    memory_path = os.path.join(memory_dir, "long_term.json")
+    current_memory = {}
+    existing_name = ""
+    if os.path.exists(memory_path):
+        try:
+            with open(memory_path, "r", encoding="utf-8") as f:
+                current_memory = json.load(f)
+                existing_name = current_memory.get("identity", {}).get("name", {}).get("value", "")
+        except Exception:
+            pass
+
+    # Request credentials from user
+    print("\033[33m[REQUERIDO] Por favor ingresa los datos fundamentales de JARVIS:\033[0m")
+    print()
+    
+    # 1. Name
+    name_prompt = f" ¿Cómo quieres que te llame JARVIS? [{existing_name}]: " if existing_name else " ¿Cómo quieres que te llame JARVIS?: "
+    user_name = input(name_prompt).strip()
+    if not user_name and existing_name:
+        user_name = existing_name
+    while not user_name:
+        print("\033[31m[ERROR] El nombre es obligatorio.\033[0m")
+        user_name = input(" ¿Cómo quieres que te llame JARVIS?: ").strip()
+
+    # 2. Gemini API Key
+    existing_gemini = current_config.get("gemini_api_key", "")
+    gemini_prompt = f" Gemini API Key [{existing_gemini[:6]}...{existing_gemini[-6:] if len(existing_gemini) > 12 else ''}]: " if existing_gemini else " Gemini API Key: "
+    user_gemini = input(gemini_prompt).strip()
+    if not user_gemini and existing_gemini:
+        user_gemini = existing_gemini
+    while not user_gemini:
+        print("\033[31m[ERROR] La Gemini API Key es obligatoria para el funcionamiento base.\033[0m")
+        user_gemini = input(" Gemini API Key: ").strip()
+
+    # 3. OpenRouter API Key
+    existing_openrouter = current_config.get("openrouter_api_key", "")
+    openrouter_prompt = f" OpenRouter API Key [{existing_openrouter[:6]}...{existing_openrouter[-6:] if len(existing_openrouter) > 12 else ''}]: " if existing_openrouter else " OpenRouter API Key: "
+    user_openrouter = input(openrouter_prompt).strip()
+    if not user_openrouter and existing_openrouter:
+        user_openrouter = existing_openrouter
+    while not user_openrouter:
+        print("\033[31m[ERROR] La OpenRouter API Key es obligatoria para razonamiento complejo.\033[0m")
+        user_openrouter = input(" OpenRouter API Key: ").strip()
+
+    # Save to config/api_keys.json
+    current_config["gemini_api_key"] = user_gemini
+    current_config["openrouter_api_key"] = user_openrouter
+    with open(api_keys_path, "w", encoding="utf-8") as f:
+        json.dump(current_config, f, indent=4)
+    print("\033[32m[OK] Archivo config/api_keys.json configurado correctamente.\033[0m")
+
+    # Save name to memory/long_term.json
+    if not os.path.exists(memory_dir):
+        os.makedirs(memory_dir, exist_ok=True)
+    if "identity" not in current_memory:
+        current_memory["identity"] = {}
+    if "name" not in current_memory["identity"]:
+        current_memory["identity"]["name"] = {}
+    current_memory["identity"]["name"]["value"] = user_name
+    with open(memory_path, "w", encoding="utf-8") as f:
+        json.dump(current_memory, f, indent=4)
+    print("\033[32m[OK] Memoria de usuario guardada correctamente.\033[0m")
+
     if not os.path.exists(rules_path):
-        import json
         with open(rules_path, "w", encoding="utf-8") as f:
             json.dump({"rules": []}, f, indent=4)
         print("\033[32m[OK] Archivo rules.json creado.\033[0m")

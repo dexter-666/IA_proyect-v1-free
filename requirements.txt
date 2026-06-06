@@ -33,3 +33,5 @@ cryptography
 eventlet
 vosk
 qtawesome
+python-docx
+openpyxl
