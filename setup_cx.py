@@ -1,18 +1,38 @@
 import sys
 from cx_Freeze import setup, Executable
 
-# Dependencies are automatically detected, but it might need fine tuning.
 build_exe_options = {
     "packages": [
-        "os", "sys", "json", "pathlib", "PyQt6", "actions", "agent", "memory", "core", 
-        "google", "psutil", "pygetwindow", "pyrect", "pyautogui", "comtypes", "pycaw", 
-        "sounddevice", "numpy", "vosk", "spotipy", "docx", "openpyxl", "qtawesome",
-        "websockets", "asyncio", "ctypes", "win10toast"
+        "os", "sys", "json", "pathlib", "asyncio", "ctypes",
+        "websockets", "numpy", "sounddevice", "vosk", "spotipy",
+        "psutil", "pyautogui", "pygetwindow", "pyrect",
+        "comtypes", "pycaw", "docx", "openpyxl", "qtawesome",
+        "win10toast", "PyQt6", "actions", "agent", "memory",
+        "core", "google",
+        "_sounddevice_data",
     ],
-    "include_files": ["assets/", ("config/api_keys.example.json", "config/api_keys.json"), "config/accessibility_config.json", "config/rules.json", "config/user_profile.json"],
-    "excludes": ["unittest"],
+
+    "include_files": [
+        "assets/",
+        "memory/",
+        "config/",
+        # 👇 CORREGIDO: site-packages con guion
+        (
+            r".venv\Lib\site-packages\_sounddevice_data",
+            "lib/_sounddevice_data"
+        ),
+    ],
+
+    "include_msvcr": True,
     "optimize": 2,
-    "include_msvcr": True
+
+    "zip_exclude_packages": ["_sounddevice_data"],
+
+    "excludes": [
+        "tkinter",
+        "unittest",
+        "PySide6"
+    ]
 }
 
 base = "Win32GUI" if sys.platform == "win32" else None
@@ -24,5 +44,10 @@ setup(
     options={"build_exe": build_exe_options},
     executables=[
         Executable(
-            "run.py", base=base, icon="assets/jarvis_icono.ico", target_name="JARVIS.exe")]
+            "run.py",
+            base=base,
+            icon="assets/jarvis_icono.ico",
+            target_name="JARVIS.exe"
+        )
+    ]
 )

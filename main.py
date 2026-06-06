@@ -2,6 +2,7 @@ import os
 import json
 import sys
 from pathlib import Path
+import json as json_module
 
 # Load config early to determine GPU acceleration settings
 _gpu_enabled = False
@@ -2852,6 +2853,7 @@ class JarvisLive:
         loop = asyncio.get_event_loop()
 
         def callback(indata, frames, time_info, status):
+            import json
             if getattr(self, "is_sleeping", False):
                 if getattr(self, "vosk_recognizer", None):
                     audio_data = indata.tobytes()
